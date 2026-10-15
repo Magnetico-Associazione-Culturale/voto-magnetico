@@ -1,0 +1,22 @@
+node_modules/
+data/
+.env
+*.sqlite
+*.sqlite-journal
+.code-secret
+backup/
+.DS_Store
+# elenchi dei soci: mai nel repository
+elenco*.csv
+soci*.csv
+_archivio/
+# export dell'anagrafica soci (Excel): mai nel repository
+*.xlsx
+*.xls
+anagrafica*.csv
+presenti*.csv
+# documenti interni di lavoro (prodotto, design, revisioni): restano solo in locale
+PRODUCT.md
+DESIGN.md
+GUIDA-INTERNA.md
+.impeccable/

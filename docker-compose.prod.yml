@@ -1,0 +1,41 @@
+# PRODUZIONE (server AWS). Avvio: ./scripts/deploy.sh
+# Caddy ottiene da solo il certificato HTTPS e NON scrive log di accesso (nessun IP salvato).
+services:
+  app:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: "1"
+      REQUIRE_2FA: "1"
+    volumes:
+      - dati:/data
+    restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: 5m
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  dati:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,28 @@
+# PROVA LOCALE (Mac). Avvio consigliato: ./avvia-test.sh
+#  - pannello:            http://<IP-del-Mac>:3000   (utente admin / password prova1234)
+#  - email dei codici:    http://localhost:8025       (Mailpit: le email non partono davvero)
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DEV_SEED: "1"             # crea admin e votazione di prova al primo avvio
+      REQUIRE_2FA: "0"          # in prova la verifica a due fattori è facoltativa
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      MAIL_FROM: "Votazioni Magnetico (PROVA) <prova@magnetico.local>"
+    volumes:
+      - dati-prova:/data
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+
+volumes:
+  dati-prova:

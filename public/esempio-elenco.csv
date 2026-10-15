@@ -1,0 +1,18 @@
+Codice;Cognome;Nome;Data Nascita;Cod.Fiscale;Email;Gruppo;Scad. Tessera;Stato
+001;Bianchi;Giulia;12/03/1985;TSTCF00000000001;giulia.bianchi@example.test;SOCI;31/12/2026;Attivo
+002;Russo;Marco;04/07/1979;TSTCF00000000002;marco.russo@example.test;DIRETTIVO;31/01/2027;Attivo
+003;Ferrari;Francesca;23/11/1990;TSTCF00000000003;francesca.ferrari@example.test;SOCI;30/04/2027;Attivo
+004;Esposito;Luca;02/02/1988;TSTCF00000000004;luca.esposito@example.test;SOCI;31/12/2026;Attivo
+005;Romano;Chiara;17/09/1995;TSTCF00000000005;chiara.romano@example.test;SOCI;31/01/2027;Attivo
+006;Colombo;Andrea;08/06/1982;TSTCF00000000006;andrea.colombo@example.test;SOCI;30/11/2026;Attivo
+007;Ricci;Sara;30/01/2001;TSTCF00000000007;sara.ricci@example.test;SOCI;31/03/2027;Attivo
+008;Marino;Paolo;14/10/1975;TSTCF00000000008;paolo.marino@example.test;SOCI;31/12/2026;Attivo
+009;Greco;Elena;21/04/1998;TSTCF00000000009;elena.greco@example.test;SOCI;31/07/2027;Attivo
+010;Bruno;Davide;05/12/1986;TSTCF00000000010;davide.bruno@example.test;COLLABORATORI;31/12/2026;Attivo
+011;Gallo;Martina;19/08/1993;TSTCF00000000011;;SOCI;31/01/2027;Attivo
+012;Conti;Tommaso;15/05/2010;TSTCF00000000012;famiglia.conti@example.test;SOCI;31/12/2026;Attivo
+013;Costa;Roberto;09/09/1980;TSTCF00000000013;roberto.costa@example.test;SOCI;30/09/2026;Attivo
+014;Rossi;Mario;01/06/1970;TSTCF00000000014;mario.rossi70@example.test;SOCI;31/12/2026;Attivo
+015;Rossi;Mario;22/02/1992;TSTCF00000000015;mario.rossi92@example.test;SOCI;31/01/2027;Attivo
+016;Bianchi;Giulia;12/03/1985;TSTCF00000000001;giulia.bianchi@example.test;SOCI;31/12/2026;Attivo
+017;De Luca;Anna;11/11/1991;TSTCF00000000017;anna.deluca@example.test;SOCI;;Attivo

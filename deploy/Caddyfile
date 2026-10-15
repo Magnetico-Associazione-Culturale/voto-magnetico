@@ -1,0 +1,9 @@
+# Nessuna direttiva "log": Caddy non registra le richieste (niente IP né user agent).
+{
+	admin off
+}
+
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000
+}
