@@ -10,7 +10,16 @@ export function createMailer(cfg) {
       },
     };
   }
+  // Nome con cui il server si presenta (EHLO). Il relay SMTP di Google rifiuta i nomi
+  // che non sono un dominio vero, come l'identificativo interno del container.
+  let ehlo;
+  try {
+    ehlo = cfg.publicUrl ? new URL(cfg.publicUrl).hostname : undefined;
+  } catch {
+    ehlo = undefined;
+  }
   const transport = nodemailer.createTransport({
+    name: ehlo,
     host: cfg.smtp.host,
     port: cfg.smtp.port,
     secure: cfg.smtp.secure,
