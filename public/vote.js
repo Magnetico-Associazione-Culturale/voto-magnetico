@@ -162,7 +162,8 @@
               state.abstain = false;
               state.nonce = newNonce();
               for (const q of state.ballot.questions) {
-                state.order[q.id] = shuffle(q.candidates);
+                // Nelle elezioni l'ordine dei nomi è casuale; nei quesiti è fisso (Favorevole, Non favorevole).
+                state.order[q.id] = q.kind === 'quesito' ? q.candidates : shuffle(q.candidates);
                 state.picks[q.id] = [];
               }
               state.screen = 'ballot';
@@ -194,7 +195,11 @@
     const list = state.picks[q.id];
     const i = list.findIndex((p) => p.name.toLowerCase() === cand.name.toLowerCase());
     if (i >= 0) list.splice(i, 1);
-    else if (list.length < q.maxPrefs) {
+    else if (q.kind === 'quesito') {
+      // Quesito: una sola risposta, toccare l'altra la sostituisce.
+      list.splice(0, list.length, cand);
+      state.blank[q.id] = false;
+    } else if (list.length < q.maxPrefs) {
       list.push(cand);
       state.blank[q.id] = false;
     }
@@ -203,18 +208,21 @@
 
   function questionBlock(q) {
     const list = state.picks[q.id];
-    const full = list.length >= q.maxPrefs;
+    const motion = q.kind === 'quesito';
+    const full = !motion && list.length >= q.maxPrefs;
     const block = h(
       'section',
-      { class: 'card question' },
+      { class: `card question${motion ? ' motion' : ''}` },
       h('h2', {}, q.title),
-      h(
-        'p',
-        { class: 'muted' },
-        q.maxPrefs === 1 ? 'Scegli 1 nome.' : `Scegli fino a ${q.maxPrefs} nomi (anche meno).`,
-        ' Scelti ',
-        h('span', { class: 'count' }, `${list.length}/${q.maxPrefs}`),
-      ),
+      motion
+        ? h('p', { class: 'muted' }, 'Scegli una risposta.')
+        : h(
+            'p',
+            { class: 'muted' },
+            q.maxPrefs === 1 ? 'Scegli 1 nome.' : `Scegli fino a ${q.maxPrefs} nomi (anche meno).`,
+            ' Scelti ',
+            h('span', { class: 'count' }, `${list.length}/${q.maxPrefs}`),
+          ),
       h(
         'div',
         { class: 'choices' },

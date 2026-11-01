@@ -51,18 +51,42 @@ export function tallyRound(db, round) {
       }
     }
 
-    const ranking = [...counts.values()]
-      .map((c) => ({ ...c, total: c.online + c.paper }))
-      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'it'));
+    const paperTotals = p ? { schede: Number(p.schede) || 0, bianche: Number(p.bianche) || 0, nulle: Number(p.nulle) || 0 } : null;
+    const all = [...counts.values()].map((c) => ({ ...c, total: c.online + c.paper }));
+
+    if (q.kind === 'quesito') {
+      // Ordine fisso (Favorevole, Non favorevole). Approvato con la metà + 1 dei votanti:
+      // votanti = tutte le schede del turno (astensioni comprese) + le schede cartacee.
+      const ranking = q.candidates.map((c) => all.find((r) => r.name === c.name));
+      const votanti = rows.length + (paperTotals?.schede ?? 0);
+      const favorevoli = ranking[0]?.total ?? 0;
+      const maggioranza = Math.floor(votanti / 2) + 1;
+      return {
+        id: q.id,
+        kind: 'quesito',
+        title: q.title,
+        seats: q.seats,
+        maxPrefs: q.maxPrefs,
+        ranking,
+        blank,
+        paper: paperTotals,
+        elected: [],
+        tie: null,
+        motion: { favorevoli, contrari: ranking[1]?.total ?? 0, votanti, maggioranza, approvato: votanti > 0 && favorevoli >= maggioranza },
+      };
+    }
+
+    const ranking = all.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'it'));
 
     return {
       id: q.id,
+      kind: 'elezione',
       title: q.title,
       seats: q.seats,
       maxPrefs: q.maxPrefs,
       ranking,
       blank,
-      paper: p ? { schede: Number(p.schede) || 0, bianche: Number(p.bianche) || 0, nulle: Number(p.nulle) || 0 } : null,
+      paper: paperTotals,
       ...electedAndTie(ranking, q.seats),
     };
   });

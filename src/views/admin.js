@@ -79,7 +79,31 @@ export function dashboardPage({ elections }) {
 </section>`;
 }
 
+const MOTION_RULE = 'approvato con la metà + 1 dei votanti (schede bianche e astenuti contano come non favorevoli)';
+
+function motionCard(q, editable) {
+  return html`<div class="question-admin">
+  <div class="q-head">
+    <h3><span class="pill">Quesito</span> ${q.title}</h3>
+    <p class="muted">Risposte: Favorevole / Non favorevole · ${MOTION_RULE}</p>
+  </div>
+  ${editable
+    ? html`<details>
+      <summary>Modifica o elimina il quesito</summary>
+      <form method="post" action="/admin/domande/${q.id}" class="grid-form">
+        <label class="wide">Testo del quesito <input name="title" value="${q.title}" required></label>
+        <div class="wide"><button class="btn">Salva quesito</button></div>
+      </form>
+      <form method="post" action="/admin/domande/${q.id}/elimina" data-confirm="Eliminare il quesito «${q.title}»?">
+        <button class="btn danger">Elimina quesito</button>
+      </form>
+    </details>`
+    : ''}
+</div>`;
+}
+
 function questionCard(q, editable) {
+  if (q.kind === 'quesito') return motionCard(q, editable);
   return html`<div class="question-admin">
   <div class="q-head">
     <h3>${q.title}</h3>
@@ -140,9 +164,16 @@ export function electionPage(d) {
     stats.emitted > 0,
     anyClosed,
   ];
+  // Gli eleggibili servono solo se si possono votare associati fuori lista (non per i quesiti).
+  const eligiblesUnneeded = !eligibles.length && questions.length > 0 && !questions.some((q) => q.kind !== 'quesito' && q.allow_write_in);
+  if (eligiblesUnneeded) done[3] = true;
   const firstTodo = done.findIndex((x, i) => i > 0 && !x);
   const steps = done.map((x, i) =>
-    x ? { cls: 'is-done', label: 'Fatto', current: false } : i === firstTodo ? { cls: 'is-current', label: 'Da fare ora', current: true } : { cls: '', label: '', current: false },
+    x
+      ? { cls: 'is-done', label: i === 3 && eligiblesUnneeded ? 'Non serve per questa scheda' : 'Fatto', current: false }
+      : i === firstTodo
+        ? { cls: 'is-current', label: 'Da fare ora', current: true }
+        : { cls: '', label: '', current: false },
   );
 
   return html`<p class="back"><a href="/admin">Tutte le votazioni</a></p>
@@ -173,18 +204,27 @@ ${d.report ? importReport(d.report) : ''}
 <section class="card${steps[2].current ? ' is-current' : ''}">
   <h2 class="step-title"><span class="step ${steps[2].cls}" aria-hidden="true">2</span>Scheda di voto<span class="step-state">${steps[2].label}</span></h2>
   ${editable
-    ? html`<p class="muted">Una votazione può avere una o più domande. Esempi: una sola domanda «Consiglio Direttivo» con 3 posti e fino a 3 preferenze; oppure tre domande «Presidente», «Vicepresidente», «Segretario» con 1 posto e 1 preferenza ciascuna.</p>`
+    ? html`<p class="muted">Una votazione può avere una o più domande, di due tipi: un'<strong>elezione</strong> (si votano persone, es. «Consiglio Direttivo» con 3 posti e fino a 3 preferenze) o un <strong>quesito</strong> (si risponde Favorevole o Non favorevole, es. «Approvazione del bilancio 2025»).</p>`
     : html`<p class="muted">La votazione è stata aperta: la scheda non è più modificabile.</p>`}
   ${questions.map((q) => questionCard(q, editable))}
   ${editable
     ? html`<details ${questions.length ? '' : 'open'} class="add-question">
-    <summary>+ Aggiungi una domanda</summary>
+    <summary>+ Aggiungi un'elezione (si votano persone)</summary>
     <form method="post" action="/admin/v/${e.id}/domande" class="grid-form">
       <label class="wide">Titolo <input name="title" required value="${questions.length ? '' : 'Consiglio Direttivo'}"></label>
       <label>Posti da assegnare <input name="seats" type="number" min="1" max="20" value="${questions.length ? 1 : 3}" required></label>
       <label>Preferenze massime <input name="maxPrefs" type="number" min="1" max="20" value="${questions.length ? 1 : 3}" required></label>
       <label class="check wide"><input type="checkbox" name="allowWriteIn" value="1" ${questions.length ? '' : 'checked'}> Si possono votare anche altri associati eleggibili (ricerca per nome)</label>
-      <div class="wide"><button class="btn primary">Aggiungi domanda</button></div>
+      <div class="wide"><button class="btn primary">Aggiungi elezione</button></div>
+    </form>
+  </details>
+  <details class="add-question">
+    <summary>+ Aggiungi un quesito (Favorevole / Non favorevole)</summary>
+    <form method="post" action="/admin/v/${e.id}/domande" class="grid-form">
+      <input type="hidden" name="kind" value="quesito">
+      <label class="wide">Testo del quesito <input name="title" required placeholder="Approvazione del bilancio consuntivo 2025"></label>
+      <p class="muted small wide">Risposte fisse: Favorevole e Non favorevole. Il quesito è ${MOTION_RULE}.</p>
+      <div class="wide"><button class="btn primary">Aggiungi quesito</button></div>
     </form>
   </details>`
     : ''}
@@ -368,19 +408,21 @@ export function screenPage({ election }) {
 
 function resultsTable(q) {
   const hasPaper = !!q.paper;
+  const motion = q.kind === 'quesito';
+  const esito = (cells) => (motion ? '' : cells);
   return html`<table class="table results">
-  <thead><tr><th>Nome</th><th class="num">Online</th>${hasPaper ? html`<th class="num">Cartacee</th><th class="num">Totale</th>` : ''}<th>Esito</th></tr></thead>
+  <thead><tr><th>${motion ? 'Risposta' : 'Nome'}</th><th class="num">Online</th>${hasPaper ? html`<th class="num">Cartacee</th><th class="num">Totale</th>` : ''}${esito(html`<th>Esito</th>`)}</tr></thead>
   <tbody>
     ${q.ranking.map(
       (r) => html`<tr class="${q.elected.includes(r.name) ? 'elected' : ''}">
       <td>${r.name}${r.listed ? '' : html` <span class="pill">fuori lista</span>`}</td>
       <td class="num">${r.online}</td>
       ${hasPaper ? html`<td class="num">${r.paper}</td><td class="num"><strong>${r.total}</strong></td>` : ''}
-      <td>${q.elected.includes(r.name) ? 'Eletto/a' : q.tie?.names.includes(r.name) ? 'Parità' : ''}</td>
+      ${esito(html`<td>${q.elected.includes(r.name) ? 'Eletto/a' : q.tie?.names.includes(r.name) ? 'Parità' : ''}</td>`)}
     </tr>`,
     )}
-    <tr class="sep"><td>Schede bianche</td><td class="num">${q.blank}</td>${hasPaper ? html`<td class="num">${q.paper.bianche}</td><td class="num">${q.blank + q.paper.bianche}</td>` : ''}<td></td></tr>
-    ${hasPaper ? html`<tr><td>Schede nulle (cartacee)</td><td class="num">–</td><td class="num">${q.paper.nulle}</td><td class="num">${q.paper.nulle}</td><td></td></tr>` : ''}
+    <tr class="sep"><td>Schede bianche</td><td class="num">${q.blank}</td>${hasPaper ? html`<td class="num">${q.paper.bianche}</td><td class="num">${q.blank + q.paper.bianche}</td>` : ''}${esito(html`<td></td>`)}</tr>
+    ${hasPaper ? html`<tr><td>Schede nulle (cartacee)</td><td class="num">–</td><td class="num">${q.paper.nulle}</td><td class="num">${q.paper.nulle}</td>${esito(html`<td></td>`)}</tr>` : ''}
   </tbody>
 </table>`;
 }
@@ -409,10 +451,12 @@ ${rounds.map(
   </div>
   ${result.questions.map(
     (q) => html`<div class="q-result">
-    <h3>${q.title}</h3>
-    <p class="muted small">${q.seats} ${q.seats === 1 ? 'posto' : 'posti'} · fino a ${q.maxPrefs} ${q.maxPrefs === 1 ? 'preferenza' : 'preferenze'}${q.paper ? html` · schede cartacee: ${q.paper.schede}` : ''}</p>
+    <h3>${q.kind === 'quesito' ? html`<span class="pill">Quesito</span> ` : ''}${q.title}</h3>
+    <p class="muted small">${q.kind === 'quesito' ? MOTION_RULE : html`${q.seats} ${q.seats === 1 ? 'posto' : 'posti'} · fino a ${q.maxPrefs} ${q.maxPrefs === 1 ? 'preferenza' : 'preferenze'}`}${q.paper ? html` · schede cartacee: ${q.paper.schede}` : ''}</p>
     ${resultsTable(q)}
-    <p><strong>Eletti:</strong> ${q.elected.length ? q.elected.join(', ') : '—'}</p>
+    ${q.kind === 'quesito'
+      ? html`<p class="motion-outcome ${q.motion.approvato ? 'yes' : 'no'}"><strong>${q.motion.approvato ? 'Approvato' : 'Respinto'}</strong> — favorevoli ${q.motion.favorevoli} su ${q.motion.votanti} votanti (servivano almeno ${q.motion.maggioranza}).</p>`
+      : html`<p><strong>Eletti:</strong> ${q.elected.length ? q.elected.join(', ') : '—'}</p>`}
     ${q.tie
       ? html`<div class="flash error">Parità all'ultimo posto utile (${q.tie.votes} voti) tra: <strong>${q.tie.names.join(', ')}</strong> — ${q.tie.seatsLeft === 1 ? 'resta 1 posto' : `restano ${q.tie.seatsLeft} posti`}.
         ${pending.has(`${round.id}:${q.id}`)
@@ -440,8 +484,10 @@ function paperForm(election, round, q) {
     ${listed.map(
       (r) => html`<label>${r.name} <input type="number" min="0" name="v:${r.name}" value="${r.paper || ''}" placeholder="0"></label>`,
     )}
-    <label class="wide">Altri nomi votati su carta (uno per riga: «Nome Cognome; voti»)
-      <textarea name="others" rows="3">${others.map((r) => `${r.name}; ${r.paper}`).join('\n')}</textarea></label>
+    ${q.kind === 'quesito'
+      ? ''
+      : html`<label class="wide">Altri nomi votati su carta (uno per riga: «Nome Cognome; voti»)
+      <textarea name="others" rows="3">${others.map((r) => `${r.name}; ${r.paper}`).join('\n')}</textarea></label>`}
     <label>Schede bianche <input type="number" min="0" name="bianche" value="${q.paper?.bianche ?? ''}" placeholder="0"></label>
     <label>Schede nulle <input type="number" min="0" name="nulle" value="${q.paper?.nulle ?? ''}" placeholder="0"></label>
     <label>Totale schede cartacee <input type="number" min="0" name="schede" value="${q.paper?.schede ?? ''}" placeholder="0"></label>

@@ -280,6 +280,9 @@ summary:hover { text-decoration: underline; text-decoration-thickness: 2px; text
 .q-result { margin: var(--s5) 0; }
 .q-result h3 { margin-bottom: var(--s1); }
 .secret { word-break: break-all; }
+.motion-outcome { display: inline-block; margin: var(--s3) 0; padding: var(--s2) var(--s4); border: 3px solid var(--black); background: var(--white); }
+.motion-outcome strong { font-weight: 800; }
+.motion-outcome.yes { background: var(--black); color: var(--white); }
 .qr-small svg { width: 200px; height: 200px; display: block; margin: var(--s3) auto; border: 8px solid var(--white); outline: 3px solid var(--black); }
 .eligible-list { columns: 3 14rem; column-gap: var(--s5); padding: 0; margin: var(--s3) 0 0; list-style: none; font-size: .88rem; }
 .eligible-list li { padding: .15rem 0; break-inside: avoid; }
@@ -442,6 +445,15 @@ body.screen main { max-width: none; padding: 0; }
 .res-meta { font-weight: 700; font-size: max(1.05rem, calc(var(--u) * 1.7)); margin: 1.4vh 0 0; }
 .res-meta span { color: var(--ink-600); font-weight: 600; }
 .res-q .screen-warn { display: block; }
+/* quesito: barre sui votanti, segno della maggioranza, esito in un modulo */
+.bar-track { position: relative; }
+.bar.fav .bar-fill { background: var(--black); }
+.bar-mark { position: absolute; top: -6px; bottom: -6px; width: 3px; margin-left: -1.5px; background: var(--black); box-shadow: 0 0 0 2px var(--white); }
+.motion-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 1vh calc(var(--u) * 1.6); margin-top: 1.6vh; }
+.motion-foot .res-meta { margin: 0; }
+.motion-verdict { margin: 0; font-size: max(1.4rem, calc(var(--u) * 2.8)); font-weight: 800; letter-spacing: -0.01em; padding: calc(var(--u) * .3) calc(var(--u) * 1.2); border: 4px solid var(--black); }
+.res-q.motion.yes .motion-verdict { background: var(--black); color: var(--white); }
+.res-q.motion.no .motion-verdict { background: var(--white); color: var(--black); }
 .res-foot { font-size: max(1.05rem, calc(var(--u) * 1.6)); font-weight: 700; margin-top: 2vh; padding: calc(var(--u) * .6) calc(var(--u) * 1.4); border: 3px solid var(--black); background: var(--white); font-variant-numeric: tabular-nums; }
 .res-foot.bad { border-color: var(--error); color: #9F2817; background: var(--error-soft); }
 

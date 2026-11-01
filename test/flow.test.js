@@ -537,3 +537,69 @@ test('reinvio a voto aperto: il codice precedente smette subito di valere', asyn
   assert.equal((await vote(t, round.slug, newCode, pick(round, 'Marco Russo'))).statusCode, 200);
   await t.cleanup();
 });
+
+test('quesito: risposte fisse, approvato solo con la metà + 1 dei votanti', async () => {
+  const t = await setup();
+  const auth = await login(t.app);
+  await adminPost(t.app, auth, '/admin/votazioni', { title: 'Assemblea con quesito', assemblyDate: '2026-10-31', durationMin: '5' });
+  let r = await adminPost(t.app, auth, '/admin/v/1/domande', { kind: 'quesito', title: 'Approvazione del bilancio 2025' });
+  assert.equal(r.statusCode, 200, r.body);
+  const q = t.db.prepare('SELECT * FROM questions').get();
+  assert.equal(q.kind, 'quesito');
+  // le risposte sono fisse: non si aggiungono né si tolgono
+  r = await adminPost(t.app, auth, `/admin/domande/${q.id}/candidati`, { name: 'Forse' });
+  assert.equal(r.statusCode, 400);
+  const cid = t.db.prepare('SELECT id FROM candidates WHERE question_id = ? LIMIT 1').get(q.id).id;
+  r = await adminPost(t.app, auth, `/admin/candidati/${cid}/elimina`);
+  assert.equal(r.statusCode, 400);
+
+  await adminPost(t.app, auth, '/admin/v/1/presenti', { csv: CSV });
+  await adminPost(t.app, auth, '/admin/v/1/codici/email');
+  const codes = codesFrom(t.outbox);
+  assert.equal(codes.length, 8);
+  await adminPost(t.app, auth, '/admin/v/1/apri');
+  const round = E.currentRound(t.db, 1);
+  const bq = round.ballot.questions[0];
+  assert.equal(bq.kind, 'quesito');
+  assert.deepEqual(bq.candidates.map((c) => c.name), ['Favorevole', 'Non favorevole']);
+  assert.equal(bq.allowWriteIn, false);
+
+  const [fav, contro] = bq.candidates.map((c) => c.id);
+  const cast = (code, content) => t.app.inject({ method: 'POST', url: `/api/v/${round.slug}/vota`, payload: { code, content, nonce: code } });
+  const pickOf = (id) => ({ answers: { [bq.id]: { picks: id ? [{ id }] : [] } } });
+  // due risposte insieme: scheda non valida
+  r = await cast(codes[0], { answers: { [bq.id]: { picks: [{ id: fav }, { id: contro }] } } });
+  assert.equal(r.statusCode, 422);
+  // nessun nome libero in un quesito
+  r = await cast(codes[0], { answers: { [bq.id]: { picks: [{ name: 'Giulia Bianchi' }] } } });
+  assert.equal(r.statusCode, 422);
+
+  // 4 favorevoli, 2 non favorevoli, 1 bianca, 1 astenuto: 8 votanti, servono 5 → respinto
+  for (const c of codes.slice(0, 4)) assert.equal((await cast(c, pickOf(fav))).statusCode, 200);
+  for (const c of codes.slice(4, 6)) assert.equal((await cast(c, pickOf(contro))).statusCode, 200);
+  assert.equal((await cast(codes[6], pickOf(null))).statusCode, 200);
+  assert.equal((await cast(codes[7], { abstain: true })).statusCode, 200);
+  await adminPost(t.app, auth, '/admin/v/1/chiudi');
+
+  let s = (await t.app.inject({ url: '/admin/api/v/1/stato', cookies: { sid: auth.sid } })).json();
+  let res = s.results.questions[0];
+  assert.equal(res.kind, 'quesito');
+  assert.deepEqual(res.ranking.map((x) => [x.name, x.total]), [['Favorevole', 4], ['Non favorevole', 2]]);
+  assert.deepEqual(res.motion, { favorevoli: 4, contrari: 2, votanti: 8, maggioranza: 5, approvato: false });
+  assert.equal(res.tie, null, 'un quesito non va mai al ballottaggio');
+  assert.deepEqual(s.ties ?? [], []);
+
+  // una scheda cartacea favorevole in più: 9 votanti, servono ancora 5 → approvato
+  r = await adminPost(t.app, auth, `/admin/v/1/turni/${round.id}/cartacee`, { question: bq.id, 'v:Favorevole': '1', 'v:Non favorevole': '0', bianche: '0', nulle: '0', schede: '1' });
+  assert.equal(r.statusCode, 200, r.body);
+  s = (await t.app.inject({ url: '/admin/api/v/1/stato', cookies: { sid: auth.sid } })).json();
+  res = s.results.questions[0];
+  assert.deepEqual(res.motion, { favorevoli: 5, contrari: 2, votanti: 9, maggioranza: 5, approvato: true });
+
+  // verbale e CSV
+  const page = await t.app.inject({ url: '/admin/v/1/risultati', cookies: { sid: auth.sid } });
+  assert.match(page.body, /Approvato/);
+  const csv = await t.app.inject({ url: '/admin/v/1/risultati.csv', cookies: { sid: auth.sid } });
+  assert.match(csv.body, /Esito;Approvato/);
+  await t.cleanup();
+});

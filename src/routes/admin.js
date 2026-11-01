@@ -239,14 +239,15 @@ export async function adminRoutes(app) {
     }),
   );
 
-  const qData = (b = {}) => ({ title: b.title, seats: Number(b.seats), maxPrefs: Number(b.maxPrefs), allowWriteIn: b.allowWriteIn === '1' });
+  const qData = (b = {}) => ({ kind: b.kind, title: b.title, seats: Number(b.seats), maxPrefs: Number(b.maxPrefs), allowWriteIn: b.allowWriteIn === '1' });
 
   app.post(
     '/admin/v/:id/domande',
     action(async (req) => {
       E.addQuestion(db, req.params.id, qData(req.body));
-      log(req, req.params.id, `Domanda aggiunta: ${req.body.title}`);
-      return { ok: 'Domanda aggiunta.' };
+      const quesito = req.body?.kind === 'quesito';
+      log(req, req.params.id, `${quesito ? 'Quesito aggiunto' : 'Domanda aggiunta'}: ${req.body.title}`);
+      return { ok: quesito ? 'Quesito aggiunto.' : 'Domanda aggiunta.' };
     }),
   );
   app.post(
@@ -527,6 +528,14 @@ export async function adminRoutes(app) {
       rows.push(['Schede online', result.totalBallots], ['Astenuti', result.abstained], ['Codici usati', result.usedCodes]);
       rows.push(['Riconciliazione (codici usati = schede)', result.reconciled ? 'corretta' : 'NON corretta']);
       for (const q of result.questions) {
+        if (q.kind === 'quesito') {
+          rows.push([], ['Quesito', q.title], ['Risposta', 'Voti online', 'Voti cartacei', 'Totale']);
+          for (const r of q.ranking) rows.push([r.name, r.online, r.paper, r.total]);
+          rows.push(['Schede bianche', q.blank, q.paper?.bianche ?? 0, q.blank + (q.paper?.bianche ?? 0)]);
+          rows.push(['Votanti', '', '', q.motion.votanti], ['Maggioranza richiesta (metà + 1)', '', '', q.motion.maggioranza]);
+          rows.push(['Esito', q.motion.approvato ? 'Approvato' : 'Respinto']);
+          continue;
+        }
         rows.push([], ['Domanda', q.title, `${q.seats} posti`], ['Nome', 'Voti online', 'Voti cartacei', 'Totale', 'Esito']);
         for (const r of q.ranking) rows.push([r.name, r.online, r.paper, r.total, q.elected.includes(r.name) ? 'Eletto/a' : q.tie?.names.includes(r.name) ? 'Parità' : '']);
         rows.push(['Schede bianche', q.blank, q.paper?.bianche ?? 0, q.blank + (q.paper?.bianche ?? 0)]);

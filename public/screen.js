@@ -123,6 +123,7 @@
         'div',
         { class: 'screen-results' },
         r.questions.map((q) => {
+          if (q.kind === 'quesito') return motionResult(q);
           const max = Math.max(1, ...q.ranking.map((x) => x.total));
           return h(
             'section',
@@ -165,6 +166,47 @@
         h('strong', {}, r.reconciled ? 'Riconciliazione corretta' : 'Riconciliazione NON corretta'),
       ),
     ];
+  }
+
+  // Quesito: barre in proporzione ai votanti, con il segno della maggioranza richiesta (metà + 1).
+  function motionResult(q) {
+    const m = q.motion;
+    const scale = Math.max(1, m.votanti);
+    return h(
+      'section',
+      { class: `res-q motion ${m.approvato ? 'yes' : 'no'}` },
+      h('h2', {}, q.title),
+      h(
+        'ol',
+        { class: 'bars' },
+        q.ranking.map((x, i) => {
+          const bar = h('span', { class: 'bar-fill' });
+          bar.style.width = `${(x.total / scale) * 100}%`;
+          const track = h('span', { class: 'bar-track' }, bar);
+          if (i === 0) {
+            const mark = h('span', { class: 'bar-mark', title: `Maggioranza: ${m.maggioranza}` });
+            mark.style.left = `${Math.min(100, (m.maggioranza / scale) * 100)}%`;
+            track.append(mark);
+          }
+          return h('li', { class: `bar${i === 0 ? ' fav' : ''}` }, h('span', { class: 'bar-name' }, x.name), track, h('span', { class: 'bar-num' }, String(x.total)));
+        }),
+      ),
+      h(
+        'div',
+        { class: 'motion-foot' },
+        h('p', { class: 'motion-verdict' }, m.approvato ? 'Approvato' : 'Respinto'),
+        h(
+          'p',
+          { class: 'res-meta' },
+          h('span', {}, 'Votanti '),
+          String(m.votanti),
+          h('span', {}, ' · servono '),
+          `${m.maggioranza} favorevoli`,
+          h('span', {}, ' · schede bianche '),
+          String(q.blank + (q.paper?.bianche ?? 0)),
+        ),
+      ),
+    );
   }
 
   function renderControls() {

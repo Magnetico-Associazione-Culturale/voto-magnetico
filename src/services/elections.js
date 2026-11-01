@@ -86,8 +86,17 @@ export function getQuestions(db, electionId) {
   return qs.map((q) => ({ ...q, candidates: cand.all(q.id) }));
 }
 
-function cleanQuestion({ title, seats, maxPrefs, allowWriteIn }) {
+// Quesito: si risponde Favorevole o Non favorevole (in quest'ordine, mai mescolate).
+export const QUESITO_OPTIONS = ['Favorevole', 'Non favorevole'];
+
+const cleanKind = (kind) => (kind === 'quesito' ? 'quesito' : 'elezione');
+
+function cleanQuestion({ title, seats, maxPrefs, allowWriteIn, kind }) {
   const t = String(title ?? '').trim();
+  if (cleanKind(kind) === 'quesito') {
+    if (!t) throw new UserError('Il testo del quesito è obbligatorio');
+    return { t, s: 1, m: 1, w: 0 };
+  }
   const s = Number(seats);
   const m = Number(maxPrefs);
   if (!t) throw new UserError('Il titolo della domanda è obbligatorio');
@@ -98,13 +107,21 @@ function cleanQuestion({ title, seats, maxPrefs, allowWriteIn }) {
 
 export function addQuestion(db, electionId, data) {
   assertEditable(db, electionId);
-  const { t, s, m, w } = cleanQuestion(data);
-  const pos = db.prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM questions WHERE election_id = ?').get(Number(electionId)).p;
-  return Number(
-    db
-      .prepare('INSERT INTO questions (election_id, position, title, seats, max_prefs, allow_write_in) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(Number(electionId), pos, t, s, m, w).lastInsertRowid,
-  );
+  const kind = cleanKind(data.kind);
+  const { t, s, m, w } = cleanQuestion({ ...data, kind });
+  return tx(db, () => {
+    const pos = db.prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM questions WHERE election_id = ?').get(Number(electionId)).p;
+    const id = Number(
+      db
+        .prepare('INSERT INTO questions (election_id, position, title, seats, max_prefs, allow_write_in, kind) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(Number(electionId), pos, t, s, m, w, kind).lastInsertRowid,
+    );
+    if (kind === 'quesito') {
+      const ins = db.prepare('INSERT INTO candidates (question_id, name) VALUES (?, ?)');
+      for (const name of QUESITO_OPTIONS) ins.run(id, name);
+    }
+    return id;
+  });
 }
 
 function questionElection(db, questionId) {
@@ -116,7 +133,8 @@ function questionElection(db, questionId) {
 export function updateQuestion(db, questionId, data) {
   const q = questionElection(db, questionId);
   assertEditable(db, q.election_id);
-  const { t, s, m, w } = cleanQuestion(data);
+  // Il tipo non cambia: per passare da elezione a quesito si elimina e si ricrea la domanda.
+  const { t, s, m, w } = cleanQuestion({ ...data, kind: q.kind });
   db.prepare('UPDATE questions SET title = ?, seats = ?, max_prefs = ?, allow_write_in = ? WHERE id = ?').run(t, s, m, w, q.id);
   return q.election_id;
 }
@@ -131,6 +149,7 @@ export function deleteQuestion(db, questionId) {
 export function addCandidate(db, questionId, name) {
   const q = questionElection(db, questionId);
   assertEditable(db, q.election_id);
+  if (q.kind === 'quesito') throw new UserError('Le risposte di un quesito sono fisse: Favorevole e Non favorevole');
   const n = String(name ?? '').trim().replace(/\s+/g, ' ');
   if (!n) throw new UserError('Il nome del candidato è obbligatorio');
   const dup = db.prepare('SELECT 1 FROM candidates WHERE question_id = ? AND name = ? COLLATE NOCASE').get(q.id, n);
@@ -144,6 +163,7 @@ export function deleteCandidate(db, candidateId) {
   if (!c) throw new UserError('Candidato non trovato');
   const q = questionElection(db, c.question_id);
   assertEditable(db, q.election_id);
+  if (q.kind === 'quesito') throw new UserError('Le risposte di un quesito sono fisse: Favorevole e Non favorevole');
   db.prepare('DELETE FROM candidates WHERE id = ?').run(c.id);
   return q.election_id;
 }
@@ -153,11 +173,14 @@ export function buildBallot(db, electionId) {
   return {
     questions: getQuestions(db, electionId).map((q) => ({
       id: `q${q.id}`,
+      kind: q.kind,
       title: q.title,
       seats: q.seats,
       maxPrefs: q.max_prefs,
       allowWriteIn: !!q.allow_write_in,
-      candidates: q.candidates.map((c) => ({ id: `c${c.id}`, name: c.name })),
+      candidates: (q.kind === 'quesito' ? QUESITO_OPTIONS.map((n) => q.candidates.find((c) => c.name === n)).filter(Boolean) : q.candidates).map(
+        (c) => ({ id: `c${c.id}`, name: c.name }),
+      ),
     })),
   };
 }

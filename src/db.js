@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS questions (
   title TEXT NOT NULL,
   seats INTEGER NOT NULL DEFAULT 1,
   max_prefs INTEGER NOT NULL DEFAULT 1,
-  allow_write_in INTEGER NOT NULL DEFAULT 0
+  allow_write_in INTEGER NOT NULL DEFAULT 0,
+  -- elezione = si votano persone; quesito = Favorevole / Non favorevole
+  kind TEXT NOT NULL DEFAULT 'elezione'
 );
 
 CREATE TABLE IF NOT EXISTS candidates (
@@ -142,7 +144,10 @@ export function openDb(file) {
 }
 
 // Colonne aggiunte dopo la prima versione: per i database già esistenti.
-const ADDED_COLUMNS = [['voters', 'socio', "TEXT NOT NULL DEFAULT ''"]];
+const ADDED_COLUMNS = [
+  ['voters', 'socio', "TEXT NOT NULL DEFAULT ''"],
+  ['questions', 'kind', "TEXT NOT NULL DEFAULT 'elezione'"],
+];
 
 function migrate(db) {
   for (const [table, column, def] of ADDED_COLUMNS) {
